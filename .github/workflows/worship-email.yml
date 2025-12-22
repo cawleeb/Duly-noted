@@ -1,0 +1,13 @@
+name: Email-Triggered Workflow
+
+on: [push]
+repository_dispatch:
+types: [email_trigger]
+
+jobs:
+your-job:
+runs-on: ubuntu-latest
+steps:
+- name: Your Action Step
+run: echo "Triggered by email!"
+# Add your actual steps here, e.g., extract info and create OneNote page
