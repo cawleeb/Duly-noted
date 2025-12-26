@@ -1,9 +1,9 @@
-name: Email-Triggered Workflow
+name: Worship-Email-to-OneNote-Page
 
-on: [push]
+on: 
   schedule:
     - cron: '0 5 * * 6'
-  workflow_dispatch:     # optional: allow manual runs for testin
+  workflow_dispatch:     # optional: allow manual runs for testing
   types: [email_trigger]
     
 
