@@ -57,7 +57,8 @@ finally:
 
 # IMAP server credentials and connection settings
 IMAP_SERVER = 'imap.gmail.com'
-port = 993
+#port = process.env.Port #993
+#PASSWORD = process.env.PASSWORD
 # would GGC's email be used here?
 # Need to research the security of a script like this that can be accessed by 
 # someone from the outside. 
