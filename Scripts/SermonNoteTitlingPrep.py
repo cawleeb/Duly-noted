@@ -23,23 +23,16 @@ import imaplib
 from datetime import datetime
 import pyautogui
 import time
+import requests
+from msal import ConfidentialClientApplication
 # from config import 
-# import schedule
-    # Will just use Windows Task scheduler for now
 # import re
-
-# IMAP server credentials and connection settings
-# EMAIL_SERVER = 'imap.gmail.com'
-#port = process.env.Port #993
-#PASSWORD = process.env.PASSWORD
-                        
+                     
                        
-def get_email_headers(IMAP_SERVER, port, my_email, incoming_email, PASSWORD):
-    # Just need to do the basics right now.
-    # Start with getting the info from the email
+def get_email_headers(EMAIL_SERVER,EMAIL_PORT, RECEIVING_ADDRESS, incoming_email, EMAIL_PASSWORD):
     # Connect to the IMAP server
-    imap = imaplib.IMAP4_SSL(IMAP_SERVER, port)
-    imap.login(my_email, PASSWORD)
+    imap = imaplib.IMAP4_SSL(EMAIL_SERVER, )
+    imap.login(RECIEVING_ADDRESS, EMAIL_EMAIL_PASSWORD)
     imap.list()
     imap.select('inbox')
     # This should be progressed to be able to search both inboxes 
@@ -213,7 +206,7 @@ def get_email_headers(IMAP_SERVER, port, my_email, incoming_email, PASSWORD):
     # return email_headers
     imap.logout()
 
-get_email_headers(IMAP_SERVER, port, my_email, incoming_email, PASSWORD)
+get_email_headers(EMAIL_SERVER,EMAIL_PORT, RECEIVING_ADDRESS, incoming_email, EMAIL_PASSWORD)
 
 
 #%% Comment overview
@@ -273,9 +266,6 @@ cutoff_time = datetime.time(11, 0)  # Replace with the actual desired cutoff tim
 #     print("Email was sent before the cutoff time.")
 # else:
 #     print("Email was sent after the cutoff timeP.")
-#%%
-import requests
-from msal import ConfidentialClientApplication
 
 # Set your access token and section ID
 # access_token = "YOUR_ACCESS_TOKEN"
