@@ -23,4 +23,15 @@ jobs:
        # run: python -m pip install --upgrade pip requests
 
       - name: Execute Python script # Run the run.py to get the latest data
-       # run: Sermon Note Titling Prep.py
+          env:
+              EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
+              RECEIVING_ADDRESS: ${{ secrets.RECEIVING_ADDRESS }}
+              EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+              ONENOTE_TOKEN: ${{ secrets.ONENOTE_TOKEN }}
+              SENDER_ADDRESS: ${{ secrets.SENDER_ADDRESS }}
+              ONENOTE_TOKEN: ${{ secrets.ONENOTE_TOKEN }}
+              ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN ]]
+              CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+              SECTION_ID: ${{ secrets.SECTION_ID }}
+              TENANT_ID: ${{ secrets.TENANT_ID }}
+          # run: 'SermonNoteTitlingPrep.py'

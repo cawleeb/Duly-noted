@@ -279,15 +279,11 @@ from msal import ConfidentialClientApplication
 
 # Set your access token and section ID
 # access_token = "YOUR_ACCESS_TOKEN"
-client_secret = "REDACTED-CLIENT-SECRET"
-client_id = "REDACTED-CLIENT-ID"
-section_id = "REDACTED-SECTION-ID"
-tenant_id = "REDACTED-TENANT-ID"
 
 # Create a ConfidentialClientApplication
 app = ConfidentialClientApplication(
-    client_id, authority=f"https://login.microsoftonline.com/{tenant_id}",
-    client_credential=client_secret
+    CLIENT_ID, authority=f"https://login.microsoftonline.com/{TENANT_ID}",
+    client_credential=CLIENT_SECRET
 )
 # Acquire an access token
 scopes = ["https://graph.microsoft.com/.default"] # Replace with your desired scope
@@ -295,12 +291,13 @@ result = app.acquire_token_silent(scopes=scopes, account=None)
 
 if "access_token" in result:
     access_token = result["access_token"]
-    print(f"Access token: {access_token}")
+    # print(f"Access token: {access_token}")
 else:
-    print("Error acquiring access token")
+    print(f"Error acquiring access token") #. Status code: {}")
+    
 
 # Construct the request URI
-url = f"https://graph.microsoft.com/v1.0/me/onenote/sections/{section_id}/pages"
+url = f"https://graph.microsoft.com/v1.0/me/onenote/sections/{SECTION_ID}/pages"
 
 # Define the input HTML (content of your subpage)
 input_html = "<div><p>04-26</p></div>"
