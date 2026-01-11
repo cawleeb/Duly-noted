@@ -6,21 +6,13 @@ Created on Thu Jun  1 01:02:02 2023
 """
 
 #%% OneNote Sermon Titling Automation Script
-#  Basic appearance should be
+#  Basic appearance ought to be
 
 # Date 
 # Book chaper:verses
 # Pastor Name
 # Sermon Title
 
-"""Note, yes this will be imperfect, and the sermons will not always
-perfectly reflect the outline due to last minute changes, for example.
-The point is to get some basic experience with automation and email though. 
-Needs to loop each week, should probably just display the day of at midnight. 
-Note that the email is inconsistent about coming to my regular inbox versus 
-'promotions'
-
-"""
 import email
 from email import message_from_string
 from email import policy
@@ -31,52 +23,15 @@ import imaplib
 from datetime import datetime
 import pyautogui
 import time
+# from config import 
 # import schedule
     # Will just use Windows Task scheduler for now
-import re
-
-# 1 Get the creds, stored offsite. 
-file_path = 'C:/Users/caleb/Documents/ShareX/Hurl.txt'
-try:
-    with open(file_path, 'r') as file:
-        # Step 2: Read the content
-        file_content = file.read()
-
-        # Step 3: Parse the content (Example: Splitting lines)
-        creds = file_content.split('\n')
-        incoming_email = creds[1]
-        PASSWORD = creds[2]
-        my_email = creds[3]
-except FileNotFoundError:
-    print(f"The file '{file_path}' was not found.")
-except Exception as e:
-    print(f"An error occurred: {e}")
-finally:
-    # Step 4: Close the file
-    file.close()
+# import re
 
 # IMAP server credentials and connection settings
-IMAP_SERVER = 'imap.gmail.com'
+# EMAIL_SERVER = 'imap.gmail.com'
 #port = process.env.Port #993
 #PASSWORD = process.env.PASSWORD
-# would GGC's email be used here?
-# Need to research the security of a script like this that can be accessed by 
-# someone from the outside. 
-# Thankfully, not much of my matieral will be incentivized to be accessed 
-# until I begin to work on more high profile projects.
-# Accessing from the server seems like the best option though, since the 
-# PC doesn't have to be on to have the email pulled
-# Start with the basics and easiest possible approach, even if
-# it's overkill, then trim down as I'd like. 
-# Comments can be put wherever I like, just should be trimmed down if code 
-# is ever public.
-# I mostly overthink my approach, in that it will rarely be perfect on the 
-# first testing attempt, but I need to start testing regardless.
-# When in doubt, K.I.S.S, one step at a time
-# Use it or lose it. I'm ending up not actually 
-                        # incoming_email, my_email, PASSWORD, IMAP_SERVER
-                        # Test some inputs   
-                        
                         
                        
 def get_email_headers(IMAP_SERVER, port, my_email, incoming_email, PASSWORD):
