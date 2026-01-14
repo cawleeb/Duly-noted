@@ -42,7 +42,8 @@ def get_email_headers(EMAIL_SERVER, EMAIL_PORT, RECEIVING_ADDRESS, INCOMING_EMAI
     
     # How should this loop be adjusted? 
     # Ought to be based on the most recent date...
-    # 
+   
+    # Use the existing 'new-onenote-sermon-page' filter.
     for x in range(i-150, i):
         
         latest_email_uid = data[0].split()[x]
@@ -66,9 +67,11 @@ def get_email_headers(EMAIL_SERVER, EMAIL_PORT, RECEIVING_ADDRESS, INCOMING_EMAI
         subject = str(email.header.make_header(email.header.decode_header(email_message['Subject'])))
         # print(email_from)
         if email_from == 'Gospel Grace Church <info@gospelgrace.com>' and "Worship Preview:" in subject:
-            date = str(email.header.make_header(email.header.decode_header(email_message['Date'])))
+            # Get the current date and time
+            current_time = datetime.datetime.now()
+        #  date = str(email.header.make_header(email.header.decode_header(email_message['Date'])))
             # print("The date from the string shows as: ", date)
-            date_object = datetime.strptime(date, '%a, %d %b %Y %H:%M:%S %z')
+            date_object = current_time.strptime(date, '%a, %d %b %Y %H:%M:%S %z')
             # Can slice and dice up the string, but there's likely some 
             # functions I can find in Pandas or the like that will just
             # auto-convert it for me. 
@@ -170,96 +173,23 @@ def get_email_headers(EMAIL_SERVER, EMAIL_PORT, RECEIVING_ADDRESS, INCOMING_EMAI
                 # else:
                 #     continue
             # body = email.message.
-    
-
-    # mailbox = 'INBOX' #, 'PROMOTIONS']
-    #                 # Can add in promotions later
-    # email_headers = []
-    
-    # # for folder in mailbox:
-    # imap.select(mailbox)
-    # status, email = imap.search(None, f'(FROM "{incoming_email}")') #, 'UID')
-    #                             # Not sure if this should be kept of not ^
-    # # email_id = email[0].split()
-    # email_ids = email[0].split()
-    # print("email id's are: ", email_ids)
-    # # Is there anything else this search needs to include?
-    # # Search for emails from the specified email address
-    # # Should the loops be nested?
-    # # Or should I use an `if` statement
-    
-    # # Iterate through the email IDs and fetch the headers
-    # # for email_id in email_ids:
-    # # _, header_data = imap.fetch(email_id,        
-    # _, header_data = imap.fetch(email_ids, '(BODY[HEADER.FIELDS (HEADER)])', '(RFC822)')[1]
-    # # How to align my code with the pre-requisites for the _.fetch() tool?
-    # # Remember, I'm only using this function so far because it's what GPT 
-    # # told me to use
-    # print('email header data is: ', header_data, '\n')
-    # # header_bytes = bytes('\r\n'.join(header_data), 'utf-8')
-    # headers = email.message_from_bytes(header_bytes[0][1])
-
-    #     imap.logout() # Close the connection
-    # else:
-    #     print("Wrong GGC email.")
-
-    # return email_headers
     imap.logout()
 
 get_email_headers(EMAIL_SERVER,EMAIL_PORT, RECEIVING_ADDRESS, incoming_email, EMAIL_PASSWORD)
 
-
-#%% Comment overview
-    # if time >= Saturday after 11:30pm
-        # check inbox and promotions for GGC email with the 
-        # subject 'worship preview'
-    # 
-    # Date + 1 as the sermon date
-    # Subject: Book as the passage
-    # Pastor's name
-    # Assign the subject as the sermon title
-
-# Open a new onenote subpage
-# Format and paste the above text in
-# all done!
-
-        
-    
-
-
 # Combine the useful elements of this function with the earlier
-def get_email(email_message):
+def MakeNotePage(email_message):
     # How to extract the specfic email here?
-    """Extract plain text from an email message."""
-    # if email_message.is_multipart():
-    # Timing items can go outside the function    
-    # if email is a worship preview from GGC
-    # if 
-    # was sent within the given timeframe
-    for part in email_message.walk():
-        # Indentify the content type here
-        content_type = part.get_content_type()
-        if content_type == 'from':
-            # Determine if GGC sent the email or not
-            return part.get_payload(decode=True).decode()
-        if content_type == 'text/plain':
-            return part.get_payload(decode=True).decode()
-    # else: 
-        """assuming this means that there's just text in the email"""
-    #     return email_message.get_payload(decode=True).decode()
-
-#%% might be out of order
-# Get the current date and time
-current_time = datetime.datetime.now()
+    """Formatted email text for page outline inserted """
 
 # Assuming 'email_sent_time' is the timestamp of the email... Is this a good 
 # assumption?
-email_sent_time = datetime.datetime(2023, 1, 25, 10, 30)  
+# email_sent_time = datetime.datetime(2023, 1, 25, 10, 30)  
 # Replace with the actual email sent time
 
 
 # Assuming 'cutoff_time' is the desired cutoff time
-cutoff_time = datetime.time(11, 0)  # Replace with the actual desired cutoff time
+# cutoff_time = datetime.time(11, 0)  # Replace with the actual desired cutoff time
 
 # Compare the time part of 'email_sent_time' with the 'cutoff_time'
 # if email_sent_time.time() < cutoff_time:
