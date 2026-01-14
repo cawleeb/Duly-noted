@@ -5,7 +5,7 @@ Created on Thu Jun  1 01:02:02 2023
 @author: caleb
 """
 
-#%% OneNote Sermon Titling Automation Script
+# OneNote Sermon Titling Automation Script
 #  Basic appearance ought to be
 
 # Date 
@@ -21,7 +21,7 @@ from email.parser import HeaderParser
 import pandas as pd
 import imaplib
 from datetime import datetime
-import pyautogui
+# import pyautogui
 import time
 import requests
 from msal import ConfidentialClientApplication
@@ -29,10 +29,10 @@ from msal import ConfidentialClientApplication
 # import re
                      
                        
-def get_email_headers(EMAIL_SERVER,EMAIL_PORT, RECEIVING_ADDRESS, incoming_email, EMAIL_PASSWORD):
+def get_email_headers(EMAIL_SERVER, EMAIL_PORT, RECEIVING_ADDRESS, INCOMING_EMAIL, EMAIL_PASSWORD):
     # Connect to the IMAP server
     imap = imaplib.IMAP4_SSL(EMAIL_SERVER, )
-    imap.login(RECIEVING_ADDRESS, EMAIL_EMAIL_PASSWORD)
+    imap.login(RECEIVING_ADDRESS, EMAIL_PASSWORD)
     imap.list()
     imap.select('inbox')
     # This should be progressed to be able to search both inboxes 
