@@ -31,10 +31,12 @@ from msal import ConfidentialClientApplication
                        
 def get_email_headers(EMAIL_SERVER, EMAIL_PORT, RECEIVING_ADDRESS, INCOMING_EMAIL, EMAIL_PASSWORD):
     # Connect to the IMAP server
-    imap = imaplib.IMAP4_SSL(EMAIL_SERVER, )
+    imap = imaplib.IMAP4_SSL(EMAIL_SERVER)
+    imap.port = EMAIL_PORT
     imap.login(RECEIVING_ADDRESS, EMAIL_PASSWORD)
     imap.list()
     imap.select('inbox')
+    # label = 'new-lecture-note-page'
     # This should be progressed to be able to search both inboxes 
     result, data = imap.uid('search', None, "SEEN")
     i = len(data[0].split())  
@@ -44,7 +46,8 @@ def get_email_headers(EMAIL_SERVER, EMAIL_PORT, RECEIVING_ADDRESS, INCOMING_EMAI
     # Ought to be based on the most recent date...
    
     # Use the existing 'new-onenote-sermon-page' filter.
-    for x in range(i-150, i):
+    # This ought to work best in thory, but if I 
+    for x in range(i-30, i):
         
         latest_email_uid = data[0].split()[x]
         # print(latest_email_uid)
@@ -66,18 +69,18 @@ def get_email_headers(EMAIL_SERVER, EMAIL_PORT, RECEIVING_ADDRESS, INCOMING_EMAI
         # print("The subject line is: ")
         subject = str(email.header.make_header(email.header.decode_header(email_message['Subject'])))
         # print(email_from)
-        if email_from == 'Gospel Grace Church <info@gospelgrace.com>' and "Worship Preview:" in subject:
+        if email_from == INCOMING_EMAIL and "Worship Preview:" in subject:
             # Get the current date and time
             current_time = datetime.datetime.now()
-        #  date = str(email.header.make_header(email.header.decode_header(email_message['Date'])))
+            # date = str(email.header.make_header(email.header.decode_header(email_message['Date'])))
             # print("The date from the string shows as: ", date)
             date_object = current_time.strptime(date, '%a, %d %b %Y %H:%M:%S %z')
             # Can slice and dice up the string, but there's likely some 
             # functions I can find in Pandas or the like that will just
             # auto-convert it for me. 
             # this seems to be ignored in the terminal
-            email_headers = date_object.strftime('%m/%d/%y')
-            print(f"The formatted date shows as: {email_headers}")
+            Date = date_object.strftime('%m/%d/%y')
+            print(f"The formatted date shows as: {Date}")
             # Want to extract the pastor name as well
             # search email for text = phrase, "Bold"\
             # print()
@@ -85,10 +88,13 @@ def get_email_headers(EMAIL_SERVER, EMAIL_PORT, RECEIVING_ADDRESS, INCOMING_EMAI
             subject1 = subject.lstrip("Worship Preview: ")
             # Why is the stripping function getting rid of the final character?
             # print(f'The trimmed subject line is: {subject1}')
-            Passage, Title = subject1.split("|")
-            print('The passage and title are: ')
-            print(Passage)
-            print(Title.lstrip(' '))
+            Passage, Title = subject1.split(" | ")
+            # print(f'The passage and title are: ')
+            # print(Passage)
+            # print(Title)
+            Outline_strings = [Date,Passage,Title]
+            Notepage_Title = "\n".join(Outline_strings)
+            print(f'The note page title shows as: {Notepage_Title}')
             
             # pattern = re.compile(f'{re.escape(search_text)}(.+)', re.DOTALL)
 
@@ -175,7 +181,7 @@ def get_email_headers(EMAIL_SERVER, EMAIL_PORT, RECEIVING_ADDRESS, INCOMING_EMAI
             # body = email.message.
     imap.logout()
 
-get_email_headers(EMAIL_SERVER,EMAIL_PORT, RECEIVING_ADDRESS, incoming_email, EMAIL_PASSWORD)
+get_email_headers(EMAIL_SERVER,EMAIL_PORT, RECEIVING_ADDRESS, INCOMING_EMAIL, EMAIL_PASSWORD)
 
 # Combine the useful elements of this function with the earlier
 def MakeNotePage(email_message):
