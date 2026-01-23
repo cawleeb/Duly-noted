@@ -5,7 +5,7 @@ Created on Thu Jun  1 01:02:02 2023
 @author: caleb
 """
 
-# OneNote Sermon Titling Automation Script
+#%% OneNote Sermon Titling Automation Script
 #  Basic appearance ought to be
 
 # Date 
@@ -101,7 +101,7 @@ def get_email_headers(EMAIL_SERVER, EMAIL_PORT, RECEIVING_ADDRESS, INCOMING_EMAI
 
 get_email_headers(EMAIL_SERVER,EMAIL_PORT, RECEIVING_ADDRESS, INCOMING_EMAIL, EMAIL_PASSWORD)
 
-# Combine the useful elements of this function with the earlier
+#%% Combine the useful elements of this function with the earlier
 def MakeNotePage(email_message):
     # How to extract the specfic email here?
     """Formatted email text for page outline inserted """
