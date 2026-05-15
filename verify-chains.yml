@@ -1,0 +1,79 @@
+# Verify Chains — reusable GitHub Actions workflow
+# STATUS: scaffold; never executed end-to-end.
+# Customers add this file (or call it via workflow_call) to their repo.
+#
+# Required secrets:
+#   AUTH_REQUESTER_PRIVATE_KEY  — the customer's Aleo private key (signs both TXs)
+#   VERIFY_CHAINS_ADDRESS       — VC's public Aleo address (recipient of platform fee)
+#   REPO_SALT                   — per-repo secret combined with commit hashes via Poseidon
+#
+# Optional secrets (override defaults baked into the orchestrator):
+#   ENDPOINT, PROGRAM_ID, NETWORK
+#   AUTH_VIEWER_ADDRESS         — set to switch to named-viewer mode
+
+name: Verify Chains Attestation
+
+on:
+  workflow_call:
+    secrets:
+      AUTH_REQUESTER_PRIVATE_KEY:
+        required: true
+      VERIFY_CHAINS_ADDRESS:
+        required: true
+      REPO_SALT:
+        required: true
+      ENDPOINT:
+        required: false
+      PROGRAM_ID:
+        required: false
+      NETWORK:
+        required: false
+      AUTH_VIEWER_ADDRESS:
+        required: false
+
+  # For local testing in this repo — customers can remove or replace with their own triggers.
+  push:
+    branches: [main]
+
+jobs:
+  attest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # need HEAD~1 for git diff
+
+      - name: Install syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install orchestrator deps
+        working-directory: ./orchestrator
+        run: npm install
+
+      - name: Run attestation pipeline
+        working-directory: ./orchestrator
+        env:
+          AUTH_REQUESTER_PRIVATE_KEY: ${{ secrets.AUTH_REQUESTER_PRIVATE_KEY }}
+          VERIFY_CHAINS_ADDRESS: ${{ secrets.VERIFY_CHAINS_ADDRESS }}
+          REPO_SALT: ${{ secrets.REPO_SALT }}
+          ENDPOINT: ${{ secrets.ENDPOINT }}
+          PROGRAM_ID: ${{ secrets.PROGRAM_ID }}
+          NETWORK: ${{ secrets.NETWORK }}
+          AUTH_VIEWER_ADDRESS: ${{ secrets.AUTH_VIEWER_ADDRESS }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: npm start
+
+      - name: Upload SBOM artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: orchestrator/sbom.json
+          retention-days: 90
