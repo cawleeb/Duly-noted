@@ -1,145 +1,185 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Jun  1 01:02:02 2023
+Pull the most recent "Worship Preview" email from the configured inbox and
+create a OneNote page summarising the upcoming Sunday sermon.
 
-@author: caleb
+Output page format:
+    mm/dd/YYYY
+    <Scripture book chapter:verses>
+    <Sermon Title>
+
+All credentials and IDs are read from environment variables; nothing is
+hardcoded. Designed to run unattended via GitHub Actions on Saturday evening.
 """
 
-#%% OneNote Sermon Titling Automation Script
-#  Basic appearance ought to be
-
-# Date 
-# Book chaper:verses
-# Pastor Name
-# Sermon Title
-
 import email
-from email import message_from_string
-from email import policy
-from email.parser import BytesParser
-from email.parser import HeaderParser
-import pandas as pd
 import imaplib
-from datetime import datetime
-# import pyautogui
-import time
+import os
+import sys
+from datetime import datetime, timedelta
+from email.header import decode_header, make_header
+from email.utils import mktime_tz, parsedate_tz
+
 import requests
 from msal import ConfidentialClientApplication
-# from config import 
-# import re
-                     
-                       
-def get_email_headers(EMAIL_SERVER, EMAIL_PORT, RECEIVING_ADDRESS, INCOMING_EMAIL, EMAIL_PASSWORD):
-    # Connect to the IMAP server
-    imap = imaplib.IMAP4_SSL(EMAIL_SERVER)
-    imap.port = EMAIL_PORT
-    imap.login(RECEIVING_ADDRESS, EMAIL_PASSWORD)
-    imap.list()
-    imap.select('inbox')
-    # label = 'new-lecture-note-page'
-    # This should be progressed to be able to search both inboxes 
-    result, data = imap.uid('search', None, "SEEN")
-    i = len(data[0].split())  
-    # print(i)
-    
-    # How should this loop be adjusted? 
-    # Ought to be based on the most recent date...
-   
-    # Use the existing 'new-onenote-sermon-page' filter.
-    # This ought to work best in thory, but if I 
-    for x in range(i-30, i):
-        
-        latest_email_uid = data[0].split()[x]
-        # print(latest_email_uid)
-        result, email_data = imap.uid('fetch', latest_email_uid, '(RFC822)')
-        # print(result)
-        # print(email_data)
-        
-        raw_email = email_data[0][1]
-        raw_email_string = raw_email.decode('utf-8')
-        email_message = email.message_from_string(raw_email_string)
 
-        # Header Details
-        date_tuple = email.utils.parsedate_tz(email_message['Date'])
-        if date_tuple:
-            # local_date = datetime.datetime.fromtimestamp(email.utils.mktime_tz(date_tuple))
-            local_date = datetime.fromtimestamp(email.utils.mktime_tz(date_tuple))
-            local_message_date = "%s" %(str(local_date.strftime("%a, %d %b %Y"))) #" %H:%M:%S")))
-        email_from = str(email.header.make_header(email.header.decode_header(email_message['From'])))
-        # print("The subject line```` is: ")
-        subject = str(email.header.make_header(email.header.decode_header(email_message['Subject'])))
-        # print(email_from)
-        if email_from == INCOMING_EMAIL and "Worship Preview:" in subject:
-            # Get the current date and time
-            current_time = datetime.datetime.now()
-            # date = str(email.header.make_header(email.header.decode_header(email_message['Date'])))
-            # print("The date from the string shows as: ", date)
-            date_object = current_time.strptime(date, '%a, %d %b %Y %H:%M:%S %z')
-            # Can slice and dice up the string, but there's likely some 
-            # functions I can find in Pandas or the like that will just
-            # auto-convert it for me. 
-            # this seems to be ignored in the terminal
-            Date = date_object.strftime('%m/%d/%y')
-            print(f"The formatted date shows as: {Date}")
-            # Want to extract the pastor name as well
-            # search email for text = phrase, "Bold"\
-            # print()
-            # print(f'The subject line pre-trim is {subject}')
-            subject1 = subject.lstrip("Worship Preview: ")
-            # Why is the stripping function getting rid of the final character?
-            # print(f'The trimmed subject line is: {subject1}')
-            Passage, Title = subject1.split(" | ")
-            # print(f'The passage and title are: ')
-            # print(Passage)
-            # print(Title)
-            Outline_strings = [Date,Passage,Title]
-            Notepage_Title = "\n".join(Outline_strings)
-            print(f'The note page title shows as: {Notepage_Title}')
-            
-            # pattern = re.compile(f'{re.escape(search_text)}(.+)', re.DOTALL)
-    imap.logout()
 
-get_email_headers(EMAIL_SERVER,EMAIL_PORT, RECEIVING_ADDRESS, INCOMING_EMAIL, EMAIL_PASSWORD)
+SUBJECT_PREFIX = "Worship Preview:"
 
-#%% Combine the useful elements of this function with the earlier
-def MakeNotePage(email_message):
-    # How to extract the specfic email here?
-    """Formatted email text for page outline inserted """
-    # Set your access token and section ID
-    # access_token = "YOUR_ACCESS_TOKEN"
 
-    # Create a ConfidentialClientApplication
-    app = ConfidentialClientApplication(
-        CLIENT_ID, authority=f"https://login.microsoftonline.com/{TENANT_ID}",
-        client_credential=CLIENT_SECRET
+def _env(name: str) -> str:
+    value = os.environ.get(name)
+    if not value:
+        sys.exit(f"Missing required environment variable: {name}")
+    return value
+
+
+def _decode(header_value: str) -> str:
+    return str(make_header(decode_header(header_value or "")))
+
+
+def parse_subject(subject: str) -> tuple[str, str]:
+    """'Worship Preview: 1 John 3:1-10 | Children of God' -> ('1 John 3:1-10', 'Children of God')."""
+    if not subject.startswith(SUBJECT_PREFIX):
+        raise ValueError(f"Subject is not a worship preview: {subject!r}")
+    body = subject[len(SUBJECT_PREFIX):].strip()
+    passage, title = body.split("|", 1)
+    return passage.strip(), title.strip()
+
+
+def fetch_latest_worship_preview(
+    server: str, port: int, address: str, password: str, sender: str
+):
+    """Return (sermon_date, passage, title) for the most recent matching email,
+    or None if no matching email exists. The email arrives Saturday; the
+    sermon is the following Sunday, so we add one day to the email date.
+    """
+    with imaplib.IMAP4_SSL(server, port) as imap:
+        imap.login(address, password)
+        imap.select("INBOX")
+        typ, data = imap.search(
+            None, "FROM", f'"{sender}"', "SUBJECT", f'"{SUBJECT_PREFIX}"'
+        )
+        if typ != "OK" or not data or not data[0]:
+            return None
+        latest_uid = data[0].split()[-1]
+        _, msg_data = imap.fetch(latest_uid, "(RFC822)")
+        message = email.message_from_bytes(msg_data[0][1])
+
+    subject = _decode(message["Subject"])
+    passage, title = parse_subject(subject)
+
+    date_tuple = parsedate_tz(message["Date"])
+    email_dt = datetime.fromtimestamp(mktime_tz(date_tuple))
+    sermon_date = email_dt.date() + timedelta(days=1)
+    return sermon_date, passage, title
+
+
+def build_page_title(sermon_date, passage: str, title: str) -> str:
+    """Pack date / passage / title into a single page-title string (newline-
+    separated). OneNote preserves the newlines so the three values render as
+    stacked lines in the page-title slot rather than in the body."""
+    return f"{sermon_date:%m/%d/%Y}\n{passage}\n{title}"
+
+
+def build_page_html(page_title: str) -> str:
+    return (
+        "<!DOCTYPE html>"
+        "<html>"
+        f"<head><title>{page_title}</title></head>"
+        "<body></body>"
+        "</html>"
     )
-    # Acquire an access token
-    scopes = ["https://graph.microsoft.com/.default"] # Replace with your desired scope
-    result = app.acquire_token_silent(scopes=scopes, account=None)
 
-    if "access_token" in result:
-        access_token = result["access_token"]
-        # print(f"Access token: {access_token}")
+
+def acquire_access_token(client_id: str, client_secret: str, tenant_id: str) -> str:
+    # NOTE: app-only tokens (acquire_token_for_client) cannot hit /me/onenote.
+    # Personal OneNote notebooks require a delegated user token; org accounts
+    # can use /users/{userId}/onenote/sections/{section_id}/pages with
+    # Notes.ReadWrite.All. Adjust the URL to match your tenant setup.
+    app = ConfidentialClientApplication(
+        client_id,
+        authority=f"https://login.microsoftonline.com/{tenant_id}",
+        client_credential=client_secret,
+    )
+    result = app.acquire_token_for_client(
+        scopes=["https://graph.microsoft.com/.default"]
+    )
+    access_token = result.get("access_token")
+    if not access_token:
+        sys.exit(f"Token acquisition failed: {result.get('error_description', result)}")
+    return access_token
+
+
+def post_to_onenote(html: str, access_token: str, section_id: str) -> str:
+    """POST the page and return the new page id."""
+    response = requests.post(
+        f"https://graph.microsoft.com/v1.0/me/onenote/sections/{section_id}/pages",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/xhtml+xml",
+        },
+        data=html.encode("utf-8"),
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json().get("id", "")
+
+
+def verify_page_created(
+    access_token: str, section_id: str, expected_title: str
+) -> bool:
+    """Query the section for its most recent page and confirm its title
+    matches what we just posted. Returns True on match."""
+    response = requests.get(
+        f"https://graph.microsoft.com/v1.0/me/onenote/sections/{section_id}/pages",
+        headers={"Authorization": f"Bearer {access_token}"},
+        params={"$top": 1, "$orderby": "createdDateTime desc"},
+        timeout=30,
+    )
+    response.raise_for_status()
+    pages = response.json().get("value", [])
+    if not pages:
+        return False
+    # OneNote may collapse newlines in the returned title; compare on the
+    # whitespace-normalised form so cosmetic differences don't fail the check.
+    actual = " ".join(pages[0].get("title", "").split())
+    expected = " ".join(expected_title.split())
+    return actual == expected
+
+
+def main() -> None:
+    preview = fetch_latest_worship_preview(
+        server=_env("EMAIL_SERVER"),
+        port=int(_env("EMAIL_PORT")),
+        address=_env("RECEIVING_ADDRESS"),
+        password=_env("EMAIL_PASSWORD"),
+        sender=_env("INCOMING_EMAIL"),
+    )
+    if preview is None:
+        print("No worship preview email found.")
+        return
+
+    sermon_date, passage, title = preview
+    print(f"Found preview: {sermon_date:%m/%d/%Y} | {passage} | {title}")
+
+    page_title = build_page_title(sermon_date, passage, title)
+    html = build_page_html(page_title)
+
+    section_id = _env("SECTION_ID")
+    access_token = acquire_access_token(
+        client_id=_env("CLIENT_ID"),
+        client_secret=_env("CLIENT_SECRET"),
+        tenant_id=_env("TENANT_ID"),
+    )
+    page_id = post_to_onenote(html, access_token, section_id)
+    print(f"OneNote page created: id={page_id or '<unknown>'}")
+
+    if verify_page_created(access_token, section_id, page_title):
+        print("Verification: most recent page in section matches expected title.")
     else:
-        print(f"Error acquiring access token") #. Status code: {}")
-        
+        sys.exit("Verification failed: most recent page does not match the posted title.")
 
-    # Construct the request URI
-    url = f"https://graph.microsoft.com/v1.0/me/onenote/sections/{SECTION_ID}/pages"
 
-    # Define the input HTML (content of your subpage)
-    input_html = "<div><p>04-26</p></div>"
-
-    # Send the POST request
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/xhtml+xml",
-    }
-    response = requests.post(url, headers=headers, data=input_html)
-
-    if response.status_code == 201:
-        print("Subpage created successfully!")
-    else:
-        print(f"Error creating subpage. Status code: {response.status_code}")
-
-# %%
+if __name__ == "__main__":
+    main()

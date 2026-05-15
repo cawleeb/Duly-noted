@@ -1,10 +1,11 @@
 name: Worship-Email-to-OneNote-Page
 
-on: 
+on:
   schedule:
-    - cron: '0 5 * * 6'
-  workflow_dispatch:     # optional: allow manual runs for testing
-  types: # run .py file
+    # Saturdays at 02:00 UTC = Friday 19:00 MT (church email lands Saturday evening)
+    # Adjust if your timezone or the email's arrival time shifts.
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -12,26 +13,27 @@ jobs:
 
     steps:
       - name: Checkout repository content
-       # uses: actions/checkout@v2 # Checkout the repository content to github runner.
+        uses: actions/checkout@v4
 
-      - name: Setup Python Version
-       # uses: actions/setup-python@v2
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.8 # Install the python version needed
+          python-version: '3.11'
 
       - name: Install Python dependencies
-       # run: python -m pip install --upgrade pip requests
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests msal
 
-      - name: Execute Python script # Run the run.py to get the latest data
-          env:
-              EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
-              RECEIVING_ADDRESS: ${{ secrets.RECEIVING_ADDRESS }}
-              EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-              ONENOTE_TOKEN: ${{ secrets.ONENOTE_TOKEN }}
-              SENDER_ADDRESS: ${{ secrets.SENDER_ADDRESS }}
-              ONENOTE_TOKEN: ${{ secrets.ONENOTE_TOKEN }}
-              ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN ]]
-              CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-              SECTION_ID: ${{ secrets.SECTION_ID }}
-              TENANT_ID: ${{ secrets.TENANT_ID }}
-          # run: 'SermonNoteTitlingPrep.py'
+      - name: Run sermon note titling script
+        env:
+          EMAIL_SERVER: ${{ secrets.EMAIL_SERVER }}
+          EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
+          RECEIVING_ADDRESS: ${{ secrets.RECEIVING_ADDRESS }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          INCOMING_EMAIL: ${{ secrets.INCOMING_EMAIL }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+          TENANT_ID: ${{ secrets.TENANT_ID }}
+          SECTION_ID: ${{ secrets.SECTION_ID }}
+        run: python Scripts/SermonNoteTitlingPrep.py
