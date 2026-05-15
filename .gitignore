@@ -1,8 +1,32 @@
 # .gitignore
-.idea/
-venv/
-__pycache__/
-*.pyc
-.env
+
 
 # config.py
+.claude/settings.local.json
+ # Claude Code per-machine state (paths, allow-lists)
+  .claude/
+
+  # Local-only override configs — never commit these
+  config.py
+  *.local
+  *.local.*
+  .env.*
+  venv/
+  .idea/
+
+  # Python build / cache artifacts
+  .pytest_cache/
+  .mypy_cache/
+  .ruff_cache/
+  build/
+  dist/
+  *.egg-info/
+  *.pyc
+
+  # Editor / OS noise
+  .vscode/
+  .spyproject/
+  .DS_Store
+  Thumbs.db
+  desktop.ini
+  *.swp
