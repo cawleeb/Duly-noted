@@ -1,7 +1,7 @@
 # .gitignore
 
 
-# config.py
+config.py
 .claude/settings.local.json
  # Claude Code per-machine state (paths, allow-lists)
   .claude/
