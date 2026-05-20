@@ -3,28 +3,56 @@
 Pull the most recent "Worship Preview" email from the configured inbox and
 create a OneNote page summarising the upcoming Sunday sermon.
 
-Output page format:
+Output page title (all three lines packed into OneNote's title slot):
     mm/dd/YYYY
     <Scripture book chapter:verses>
     <Sermon Title>
 
-All credentials and IDs are read from environment variables; nothing is
-hardcoded. Designed to run unattended via GitHub Actions on Saturday evening.
+Auth: delegated device-code flow against personal Microsoft accounts.
+First local run will print a microsoft.com/devicelogin code; subsequent
+runs reuse the cached refresh token at .msal_cache.json (gitignored).
+
+Local invocation:
+    python Scripts/SermonNoteTitlingPrep.py            # real email + post
+    python Scripts/SermonNoteTitlingPrep.py --test     # canned data, no IMAP
+    python Scripts/SermonNoteTitlingPrep.py --dry-run  # parse only, no post
+
+GitHub Actions invocation runs the no-flag form and reads secrets from env.
+For CI, pre-seed .msal_cache.json by base64-encoding the local cache after a
+successful interactive run and writing it from a GH secret before the script
+runs.
 """
 
+import argparse
 import email
 import imaplib
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from email.header import decode_header, make_header
 from email.utils import mktime_tz, parsedate_tz
+from pathlib import Path
 
 import requests
-from msal import ConfidentialClientApplication
+from msal import PublicClientApplication, SerializableTokenCache
+
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass  # CI provides env vars directly; .env loader is local-only convenience
 
 
 SUBJECT_PREFIX = "Worship Preview:"
+SCOPES = ["Notes.ReadWrite"]
+CACHE_PATH = Path(__file__).resolve().parent.parent / ".msal_cache.json"
+
+CANNED_TEST_DATA = (
+    date.today(),
+    "Test 1:1-5",
+    "Test page from SermonNoteTitlingPrep --test",
+)
 
 
 def _env(name: str) -> str:
@@ -92,22 +120,38 @@ def build_page_html(page_title: str) -> str:
     )
 
 
-def acquire_access_token(client_id: str, client_secret: str, tenant_id: str) -> str:
-    # NOTE: app-only tokens (acquire_token_for_client) cannot hit /me/onenote.
-    # Personal OneNote notebooks require a delegated user token; org accounts
-    # can use /users/{userId}/onenote/sections/{section_id}/pages with
-    # Notes.ReadWrite.All. Adjust the URL to match your tenant setup.
-    app = ConfidentialClientApplication(
+def acquire_access_token(client_id: str, tenant_id: str) -> str:
+    """Delegated auth via device code flow. Caches the refresh token at
+    CACHE_PATH so subsequent runs are silent until the refresh token expires.
+    """
+    cache = SerializableTokenCache()
+    if CACHE_PATH.exists():
+        cache.deserialize(CACHE_PATH.read_text())
+
+    app = PublicClientApplication(
         client_id,
         authority=f"https://login.microsoftonline.com/{tenant_id}",
-        client_credential=client_secret,
+        token_cache=cache,
     )
-    result = app.acquire_token_for_client(
-        scopes=["https://graph.microsoft.com/.default"]
-    )
+
+    result = None
+    accounts = app.get_accounts()
+    if accounts:
+        result = app.acquire_token_silent(SCOPES, account=accounts[0])
+
+    if not result:
+        flow = app.initiate_device_flow(scopes=SCOPES)
+        if "user_code" not in flow:
+            sys.exit(f"Device flow init failed: {flow}")
+        print(flow["message"], flush=True)
+        result = app.acquire_token_by_device_flow(flow)
+
+    if cache.has_state_changed:
+        CACHE_PATH.write_text(cache.serialize())
+
     access_token = result.get("access_token")
     if not access_token:
-        sys.exit(f"Token acquisition failed: {result.get('error_description', result)}")
+        sys.exit(f"Auth failed: {result.get('error_description', result)}")
     return access_token
 
 
@@ -148,20 +192,45 @@ def verify_page_created(
     return actual == expected
 
 
-def main() -> None:
-    preview = fetch_latest_worship_preview(
-        server=_env("EMAIL_SERVER"),
-        port=int(_env("EMAIL_PORT")),
-        address=_env("RECEIVING_ADDRESS"),
-        password=_env("EMAIL_PASSWORD"),
-        sender=_env("INCOMING_EMAIL"),
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[1])
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Skip IMAP; post a canned page so you can verify OneNote auth end-to-end.",
     )
-    if preview is None:
-        print("No worship preview email found.")
-        return
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Parse the email but skip the OneNote post.",
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+
+    if args.test:
+        preview = CANNED_TEST_DATA
+        print("Running in --test mode with canned data.")
+    else:
+        preview = fetch_latest_worship_preview(
+            server=_env("EMAIL_SERVER"),
+            port=int(_env("EMAIL_PORT")),
+            address=_env("RECEIVING_ADDRESS"),
+            password=_env("EMAIL_PASSWORD"),
+            sender=_env("INCOMING_EMAIL"),
+        )
+        if preview is None:
+            print("No worship preview email found.")
+            return
 
     sermon_date, passage, title = preview
-    print(f"Found preview: {sermon_date:%m/%d/%Y} | {passage} | {title}")
+    print(f"Preview: {sermon_date:%m/%d/%Y} | {passage} | {title}")
+
+    if args.dry_run:
+        print("--dry-run set; skipping OneNote post.")
+        return
 
     page_title = build_page_title(sermon_date, passage, title)
     html = build_page_html(page_title)
@@ -169,7 +238,6 @@ def main() -> None:
     section_id = _env("SECTION_ID")
     access_token = acquire_access_token(
         client_id=_env("CLIENT_ID"),
-        client_secret=_env("CLIENT_SECRET"),
         tenant_id=_env("TENANT_ID"),
     )
     page_id = post_to_onenote(html, access_token, section_id)

@@ -1,32 +1,35 @@
 # .gitignore
 
-
+# Local config — never commit
+.env
+.env.*
+*.local
+*.local.*
 config.py
-.claude/settings.local.json
- # Claude Code per-machine state (paths, allow-lists)
-  .claude/
+.media/
 
-  # Local-only override configs — never commit these
-  config.py
-  *.local
-  *.local.*
-  .env.*
-  venv/
-  .idea/
+# Claude Code per-machine state (paths, allow-lists)
+.claude/
 
-  # Python build / cache artifacts
-  .pytest_cache/
-  .mypy_cache/
-  .ruff_cache/
-  build/
-  dist/
-  *.egg-info/
-  *.pyc
+# MSAL token cache produced by first interactive auth
+.msal_cache.json
 
-  # Editor / OS noise
-  .vscode/
-  .spyproject/
-  .DS_Store
-  Thumbs.db
-  desktop.ini
-  *.swp
+# Python build / cache artifacts
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+*.egg-info/
+venv/
+
+# Editor / OS noise
+.idea/
+.vscode/
+.spyproject/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
