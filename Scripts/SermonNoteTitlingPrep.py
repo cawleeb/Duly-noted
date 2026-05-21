@@ -44,7 +44,7 @@ except ImportError:
     pass  # CI provides env vars directly; .env loader is local-only convenience
 
 
-SUBJECT_PREFIX = "Worship Preview:"
+PREVIEW_MARKER = "Worship Preview:"
 SCOPES = ["Notes.ReadWrite"]
 CACHE_PATH = Path(__file__).resolve().parent.parent / ".msal_cache.json"
 
@@ -60,13 +60,39 @@ def _decode(header_value: str) -> str:
     return str(make_header(decode_header(header_value or "")))
 
 
-def parse_subject(subject: str) -> tuple[str, str]:
-    """'Worship Preview: 1 John 3:1-10 | Children of God' -> ('1 John 3:1-10', 'Children of God')."""
-    if not subject.startswith(SUBJECT_PREFIX):
-        raise ValueError(f"Subject is not a worship preview: {subject!r}")
-    body = subject[len(SUBJECT_PREFIX):].strip()
+def parse_preview_line(line: str) -> tuple[str, str]:
+    """'Worship Preview: 1 John 3:1-10 | Children of God' -> ('1 John 3:1-10', 'Children of God').
+    Tolerant of any leading text before 'Worship Preview:' (case-insensitive)."""
+    lower = line.lower()
+    idx = lower.find(PREVIEW_MARKER.lower())
+    if idx < 0 or "|" not in line[idx:]:
+        raise ValueError(f"Line is not a worship preview entry: {line!r}")
+    body = line[idx + len(PREVIEW_MARKER):].strip()
     passage, title = body.split("|", 1)
     return passage.strip(), title.strip()
+
+
+def _extract_body_text(message) -> str:
+    """Pull plain-text body parts out of an email message."""
+    parts = []
+    for part in (message.walk() if message.is_multipart() else [message]):
+        if part.get_content_type() != "text/plain":
+            continue
+        payload = part.get_payload(decode=True)
+        if payload:
+            charset = part.get_content_charset() or "utf-8"
+            parts.append(payload.decode(charset, errors="replace"))
+    return "\n".join(parts)
+
+
+def find_preview_line(subject: str, body_text: str) -> str | None:
+    """Locate the 'Worship Preview: ... | ...' line in either subject or body."""
+    marker = PREVIEW_MARKER.lower()
+    candidates = [subject] + body_text.splitlines()
+    for line in candidates:
+        if marker in line.lower() and "|" in line.split(":", 1)[-1]:
+            return line.strip()
+    return None
 
 
 def _extract_email_address(sender: str) -> str:
@@ -95,21 +121,31 @@ def fetch_latest_worship_preview(
         if typ != "OK":
             sys.exit(f"Could not open mailbox {mailbox!r}.")
         typ, data = imap.search(
-            None, "FROM", f'"{sender_address}"', "SUBJECT", f'"{SUBJECT_PREFIX}"'
+            None, "FROM", f'"{sender_address}"', "TEXT", f'"{PREVIEW_MARKER}"'
         )
         if typ != "OK":
             sys.exit(f"IMAP search failed in {mailbox!r}.")
         uids = data[0].split() if data and data[0] else []
-        print(f"IMAP search [{mailbox}] FROM={sender_address!r} SUBJECT={SUBJECT_PREFIX!r}: {len(uids)} match(es)")
-        if not uids:
-            return None
-        latest_uid = uids[-1]
-        _, msg_data = imap.fetch(latest_uid, "(RFC822)")
-        message = email.message_from_bytes(msg_data[0][1])
+        print(f"IMAP search [{mailbox}] FROM={sender_address!r} TEXT={PREVIEW_MARKER!r}: {len(uids)} match(es)")
 
-    subject = _decode(message["Subject"])
-    passage, title = parse_subject(subject)
-    return date.today(), passage, title
+        for uid in reversed(uids):
+            _, msg_data = imap.fetch(uid, "(RFC822)")
+            message = email.message_from_bytes(msg_data[0][1])
+            subject = _decode(message["Subject"])
+            body_text = _extract_body_text(message)
+            line = find_preview_line(subject, body_text)
+            if line is None:
+                print(f"  uid={uid.decode()}: no parseable preview line; trying next.")
+                continue
+            try:
+                passage, title = parse_preview_line(line)
+            except ValueError as exc:
+                print(f"  uid={uid.decode()}: {exc}; trying next.")
+                continue
+            print(f"Found preview line in uid={uid.decode()}: {line!r}")
+            return date.today(), passage, title
+
+    return None
 
 
 def build_page_title(sermon_date, passage: str, title: str) -> str:

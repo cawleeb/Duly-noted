@@ -40,3 +40,10 @@ jobs:
           TENANT_ID: ${{ secrets.TENANT_ID }}
           SECTION_ID: ${{ secrets.SECTION_ID }}
         run: python Scripts/SermonNoteTitlingPrep.py
+
+      - name: Restore MSAL token cache
+        run: |
+          echo "$MSAL_CACHE_B64" | base64 -d > .msal_cache.json
+        env:
+          MSAL_CACHE_B64: ${{ secrets.MSAL_CACHE_B64 }}
+        
