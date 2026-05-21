@@ -69,22 +69,41 @@ def parse_subject(subject: str) -> tuple[str, str]:
     return passage.strip(), title.strip()
 
 
+def _extract_email_address(sender: str) -> str:
+    """'Gospel Grace Church <info@gospelgrace.com>' -> 'info@gospelgrace.com'.
+    Returns the input unchanged if no angle-bracket form is present."""
+    if "<" in sender and ">" in sender:
+        return sender.split("<", 1)[1].split(">", 1)[0].strip()
+    return sender.strip()
+
+
 def fetch_latest_worship_preview(
-    server: str, port: int, address: str, password: str, sender: str
+    server: str, port: int, address: str, password: str, sender: str,
+    mailbox: str = "INBOX",
 ):
     """Return (sermon_date, passage, title) for the most recent matching email,
     or None if no matching email exists. sermon_date is the runtime date —
     the production cron fires Sunday 04:00 UTC (= Saturday evening Mountain),
-    so the runner's date.today() resolves to Sunday at execution time."""
+    so the runner's date.today() resolves to Sunday at execution time.
+
+    mailbox defaults to INBOX but can be set (via IMAP_MAILBOX env var) to
+    "[Gmail]/All Mail" so archived/filtered messages are still found."""
+    sender_address = _extract_email_address(sender)
     with imaplib.IMAP4_SSL(server, port) as imap:
         imap.login(address, password)
-        imap.select("INBOX")
+        typ, _ = imap.select(f'"{mailbox}"', readonly=True)
+        if typ != "OK":
+            sys.exit(f"Could not open mailbox {mailbox!r}.")
         typ, data = imap.search(
-            None, "FROM", f'"{sender}"', "SUBJECT", f'"{SUBJECT_PREFIX}"'
+            None, "FROM", f'"{sender_address}"', "SUBJECT", f'"{SUBJECT_PREFIX}"'
         )
-        if typ != "OK" or not data or not data[0]:
+        if typ != "OK":
+            sys.exit(f"IMAP search failed in {mailbox!r}.")
+        uids = data[0].split() if data and data[0] else []
+        print(f"IMAP search [{mailbox}] FROM={sender_address!r} SUBJECT={SUBJECT_PREFIX!r}: {len(uids)} match(es)")
+        if not uids:
             return None
-        latest_uid = data[0].split()[-1]
+        latest_uid = uids[-1]
         _, msg_data = imap.fetch(latest_uid, "(RFC822)")
         message = email.message_from_bytes(msg_data[0][1])
 
@@ -248,6 +267,7 @@ def main() -> None:
         address=_env("RECEIVING_ADDRESS"),
         password=_env("EMAIL_PASSWORD"),
         sender=_env("INCOMING_EMAIL"),
+        mailbox=os.environ.get("IMAP_MAILBOX", "INBOX"),
     )
     if preview is None:
         print("No worship preview email found.")
