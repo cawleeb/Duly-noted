@@ -29,9 +29,8 @@ import email
 import imaplib
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import date
 from email.header import decode_header, make_header
-from email.utils import mktime_tz, parsedate_tz
 from pathlib import Path
 
 import requests
@@ -74,9 +73,9 @@ def fetch_latest_worship_preview(
     server: str, port: int, address: str, password: str, sender: str
 ):
     """Return (sermon_date, passage, title) for the most recent matching email,
-    or None if no matching email exists. The email arrives Saturday; the
-    sermon is the following Sunday, so we add one day to the email date.
-    """
+    or None if no matching email exists. sermon_date is the runtime date —
+    the production cron fires Sunday 04:00 UTC (= Saturday evening Mountain),
+    so the runner's date.today() resolves to Sunday at execution time."""
     with imaplib.IMAP4_SSL(server, port) as imap:
         imap.login(address, password)
         imap.select("INBOX")
@@ -91,11 +90,7 @@ def fetch_latest_worship_preview(
 
     subject = _decode(message["Subject"])
     passage, title = parse_subject(subject)
-
-    date_tuple = parsedate_tz(message["Date"])
-    email_dt = datetime.fromtimestamp(mktime_tz(date_tuple))
-    sermon_date = email_dt.date() + timedelta(days=1)
-    return sermon_date, passage, title
+    return date.today(), passage, title
 
 
 def build_page_title(sermon_date, passage: str, title: str) -> str:
