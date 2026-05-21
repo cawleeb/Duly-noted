@@ -2,9 +2,12 @@ name: Worship-Email-to-OneNote-Page
 
 on:
   schedule:
-    # Saturdays at 02:00 UTC = Friday 19:00 MT (church email lands Saturday evening)
-    # Adjust if your timezone or the email's arrival time shifts.
-    - cron: '0 2 * * 0'
+    # Fires every Sunday 04:00 UTC, which is Saturday 21:00 MDT / 20:00 MST.
+    # GitHub Actions cron is UTC-only, so "Saturday evening MT" maps to a
+    # Sunday-morning UTC expression. The church email arrives Saturday
+    # evening; this run picks it up and uses (email date + 1 day) so the
+    # OneNote page title carries the Sunday sermon date.
+    - cron: '0 4 * * 0'
   workflow_dispatch:
 
 jobs:

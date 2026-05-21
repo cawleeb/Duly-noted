@@ -13,9 +13,10 @@ First local run will print a microsoft.com/devicelogin code; subsequent
 runs reuse the cached refresh token at .msal_cache.json (gitignored).
 
 Local invocation:
-    python Scripts/SermonNoteTitlingPrep.py            # real email + post
-    python Scripts/SermonNoteTitlingPrep.py --test     # canned data, no IMAP
-    python Scripts/SermonNoteTitlingPrep.py --dry-run  # parse only, no post
+    python Scripts/SermonNoteTitlingPrep.py                 # real email + post (same as cron)
+    python Scripts/SermonNoteTitlingPrep.py --test          # alias for manual on-demand runs
+    python Scripts/SermonNoteTitlingPrep.py --dry-run       # scrape + parse, skip OneNote post
+    python Scripts/SermonNoteTitlingPrep.py --list-sections # auth and list every section the account can see
 
 GitHub Actions invocation runs the no-flag form and reads secrets from env.
 For CI, pre-seed .msal_cache.json by base64-encoding the local cache after a
@@ -28,7 +29,7 @@ import email
 import imaplib
 import os
 import sys
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from email.header import decode_header, make_header
 from email.utils import mktime_tz, parsedate_tz
 from pathlib import Path
@@ -47,12 +48,6 @@ except ImportError:
 SUBJECT_PREFIX = "Worship Preview:"
 SCOPES = ["Notes.ReadWrite"]
 CACHE_PATH = Path(__file__).resolve().parent.parent / ".msal_cache.json"
-
-CANNED_TEST_DATA = (
-    date.today(),
-    "Test 1:1-5",
-    "Test page from SermonNoteTitlingPrep --test",
-)
 
 
 def _env(name: str) -> str:
@@ -224,7 +219,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--test",
         action="store_true",
-        help="Skip IMAP; post a canned page so you can verify OneNote auth end-to-end.",
+        help="Manual on-demand run: scrape the most recent worship email, format, and post (same pipeline as the scheduled cron). Use for testing outside of the Saturday schedule.",
     )
     parser.add_argument(
         "--dry-run",
@@ -251,19 +246,17 @@ def main() -> None:
         return
 
     if args.test:
-        preview = CANNED_TEST_DATA
-        print("Running in --test mode with canned data.")
-    else:
-        preview = fetch_latest_worship_preview(
-            server=_env("EMAIL_SERVER"),
-            port=int(_env("EMAIL_PORT")),
-            address=_env("RECEIVING_ADDRESS"),
-            password=_env("EMAIL_PASSWORD"),
-            sender=_env("INCOMING_EMAIL"),
-        )
-        if preview is None:
-            print("No worship preview email found.")
-            return
+        print("Running in --test mode (manual on-demand, real email).")
+    preview = fetch_latest_worship_preview(
+        server=_env("EMAIL_SERVER"),
+        port=int(_env("EMAIL_PORT")),
+        address=_env("RECEIVING_ADDRESS"),
+        password=_env("EMAIL_PASSWORD"),
+        sender=_env("INCOMING_EMAIL"),
+    )
+    if preview is None:
+        print("No worship preview email found.")
+        return
 
     sermon_date, passage, title = preview
     print(f"Preview: {sermon_date:%m/%d/%Y} | {passage} | {title}")
