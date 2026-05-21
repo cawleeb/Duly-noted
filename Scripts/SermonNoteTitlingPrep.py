@@ -192,6 +192,33 @@ def verify_page_created(
     return actual == expected
 
 
+def list_sections(access_token: str) -> None:
+    """Print the signed-in account and every notebook/section it can see.
+    Use this to confirm which account the cached token belongs to and to
+    copy the correct SECTION_ID into .env."""
+    me = requests.get(
+        "https://graph.microsoft.com/v1.0/me",
+        headers={"Authorization": f"Bearer {access_token}"},
+        timeout=30,
+    ).json()
+    print(f"Signed in as: {me.get('userPrincipalName') or me.get('mail') or me}")
+
+    resp = requests.get(
+        "https://graph.microsoft.com/v1.0/me/onenote/sections",
+        headers={"Authorization": f"Bearer {access_token}"},
+        params={"$select": "id,displayName,parentNotebook", "$expand": "parentNotebook($select=displayName)"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    sections = resp.json().get("value", [])
+    if not sections:
+        print("(no sections found for this account)")
+        return
+    for s in sections:
+        notebook = (s.get("parentNotebook") or {}).get("displayName", "?")
+        print(f"  [{notebook}] {s['displayName']}\n      id={s['id']}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[1])
     parser.add_argument(
@@ -204,11 +231,24 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Parse the email but skip the OneNote post.",
     )
+    parser.add_argument(
+        "--list-sections",
+        action="store_true",
+        help="Auth, print the signed-in account and all accessible OneNote sections, then exit.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+
+    if args.list_sections:
+        access_token = acquire_access_token(
+            client_id=_env("CLIENT_ID"),
+            tenant_id=_env("TENANT_ID"),
+        )
+        list_sections(access_token)
+        return
 
     if args.test:
         preview = CANNED_TEST_DATA
